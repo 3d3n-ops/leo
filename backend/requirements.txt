@@ -1,0 +1,17 @@
+fastapi
+uvicorn
+groq
+requests
+beautifulsoup4
+psycopg2-binary
+sqlalchemy
+sentence-transformers
+pinecone
+playwright
+python-dotenv
+bs4
+tf-keras
+openai
+httpx
+pydantic
+python-multipart
