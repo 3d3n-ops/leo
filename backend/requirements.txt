@@ -1,17 +1,17 @@
 fastapi
 uvicorn
-groq
-requests
-beautifulsoup4
-psycopg2-binary
-sqlalchemy
-sentence-transformers
-pinecone
 playwright
-python-dotenv
-bs4
-tf-keras
+langchain
+langchain-community
+langchain-text-splitters
 openai
-httpx
-pydantic
-python-multipart
+pinecone
+python-dotenv
+beautifulsoup4 # LangChain's WebBaseLoader dependency
+lxml # LangChain's UnstructuredURLLoader dependency
+html2text
+httpx # For async requests with Playwright
+anthropic # For Claude API as alternative to OpenAI
+python-magic-bin # For MIME type detection on Windows
+pypdf # For PDF parsing
+python-docx # For Word document parsing
