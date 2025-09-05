@@ -27,6 +27,8 @@ app = FastAPI()
 
 origins = [
     "http://localhost:3000",
+    "https://docs-wiki.vercel.app",  # Your frontend domain
+    "https://*.vercel.app",  # Vercel preview deployments
 ]
 
 app.add_middleware(

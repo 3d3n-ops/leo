@@ -23,3 +23,10 @@ PINECONE_ENVIRONMENT=your_pinecone_environment_here
 
 # Backend Configuration
 BACKEND_URL=http://localhost:8000
+
+# Railway Deployment Notes:
+# 1. Copy this file to .env for local development
+# 2. For Railway deployment, add these variables in Railway dashboard:
+#    - Go to your Railway project → Variables tab
+#    - Add each variable (without the =your_key_here part)
+#    - Railway will automatically inject them as environment variables

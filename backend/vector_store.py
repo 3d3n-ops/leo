@@ -16,10 +16,14 @@ PINECONE_ENVIRONMENT = os.getenv("PINECONE_ENVIRONMENT")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 
 if not PINECONE_API_KEY or not OPENAI_API_KEY:
-    raise ValueError("PINECONE_API_KEY and OPENAI_API_KEY must be set in the .env file")
+    logger.warning("PINECONE_API_KEY and OPENAI_API_KEY must be set in environment variables")
+    # Don't raise error during import - let the application handle it gracefully
 
 class VectorStoreManager:
     def __init__(self, index_name: str):
+        if not PINECONE_API_KEY or not OPENAI_API_KEY:
+            raise ValueError("PINECONE_API_KEY and OPENAI_API_KEY must be set in environment variables")
+        
         self.index_name = index_name
         self.pinecone = Pinecone(api_key=PINECONE_API_KEY)
         self.embeddings = OpenAIEmbeddings(api_key=OPENAI_API_KEY)
