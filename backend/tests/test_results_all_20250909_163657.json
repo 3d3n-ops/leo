@@ -1,0 +1,123 @@
+{
+  "test_metadata": {
+    "timestamp": "2025-09-09T16:36:57.195798",
+    "endpoint": "http://localhost:8000/api/chat",
+    "total_test_duration": 502.9572219848633,
+    "models_tested": [
+      "x-ai/grok-code-fast-1",
+      "openai/gpt-5",
+      "anthropic/claude-sonnet-4",
+      "qwen/qwen3-coder",
+      "deepseek/deepseek-chat-v3.1",
+      "google/gemini-2.5-pro"
+    ]
+  },
+  "performance": {
+    "total_models_tested": 6,
+    "successful_requests": 6,
+    "failed_requests": 0,
+    "average_response_time": 2.290458003679911,
+    "median_response_time": 2.198250651359558,
+    "min_response_time": 0.8591129779815674,
+    "max_response_time": 4.021432876586914,
+    "average_first_token_time": 2.288291096687317,
+    "fastest_model": "google/gemini-2.5-pro",
+    "slowest_model": "x-ai/grok-code-fast-1",
+    "failed_models": []
+  },
+  "tool_calling": {
+    "code_generation": {
+      "total_tests": 4,
+      "successful_tool_calls": 4,
+      "models_that_used_tools": [
+        "openai/gpt-5",
+        "anthropic/claude-sonnet-4",
+        "deepseek/deepseek-chat-v3.1",
+        "google/gemini-2.5-pro"
+      ],
+      "average_response_time": 29.77007097005844,
+      "response_times": [
+        13.93981385231018,
+        22.69265627861023,
+        70.79215383529663,
+        11.655659914016724
+      ]
+    },
+    "math_problem": {
+      "total_tests": 3,
+      "successful_tool_calls": 3,
+      "models_that_used_tools": [
+        "anthropic/claude-sonnet-4",
+        "deepseek/deepseek-chat-v3.1",
+        "google/gemini-2.5-pro"
+      ],
+      "average_response_time": 9.911829789479574,
+      "response_times": [
+        7.59471583366394,
+        12.522339582443237,
+        9.618433952331543
+      ]
+    },
+    "diagram_request": {
+      "total_tests": 4,
+      "successful_tool_calls": 4,
+      "models_that_used_tools": [
+        "openai/gpt-5",
+        "anthropic/claude-sonnet-4",
+        "deepseek/deepseek-chat-v3.1",
+        "google/gemini-2.5-pro"
+      ],
+      "average_response_time": 16.53739857673645,
+      "response_times": [
+        13.176466226577759,
+        15.838196516036987,
+        25.27599596977234,
+        11.858935594558716
+      ]
+    },
+    "quiz_request": {
+      "total_tests": 3,
+      "successful_tool_calls": 3,
+      "models_that_used_tools": [
+        "anthropic/claude-sonnet-4",
+        "deepseek/deepseek-chat-v3.1",
+        "google/gemini-2.5-pro"
+      ],
+      "average_response_time": 8.598625898361206,
+      "response_times": [
+        8.451899290084839,
+        11.718096733093262,
+        5.625881671905518
+      ]
+    }
+  },
+  "rag_functionality": {
+    "rag_query": {
+      "success": true,
+      "response_time": 33.27414345741272,
+      "response_length": 0,
+      "tool_calls": 1,
+      "error": null
+    },
+    "web_search": {
+      "success": true,
+      "response_time": 100.58479142189026,
+      "response_length": 0,
+      "tool_calls": 0,
+      "error": null
+    },
+    "complex_reasoning": {
+      "success": true,
+      "response_time": 23.56888461112976,
+      "response_length": 0,
+      "tool_calls": 1,
+      "error": null
+    }
+  },
+  "summary": {
+    "total_tests_run": 25,
+    "successful_tests": 25,
+    "failed_tests": 0,
+    "overall_success_rate": 1.0
+  }
+}

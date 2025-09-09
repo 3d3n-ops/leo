@@ -6,6 +6,7 @@ from pinecone.exceptions import PineconeApiException
 from langchain_openai.embeddings import OpenAIEmbeddings
 from langchain_core.documents import Document
 from dotenv import load_dotenv
+from cache_manager import VectorCache
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +54,19 @@ class VectorStoreManager:
         texts = [doc.page_content for doc in documents]
         metadatas = [doc.metadata for doc in documents]
 
-        # Generate embeddings
-        embeds = await self.embeddings.aembed_documents(texts)
+        # Check cache for embeddings first
+        texts_tuple = tuple(texts)
+        cached_embeddings = VectorCache.get_embeddings(texts_tuple)
+        
+        if cached_embeddings:
+            logger.info(f"Using cached embeddings for {len(texts)} texts")
+            embeds = cached_embeddings
+        else:
+            # Generate embeddings
+            logger.info(f"Generating embeddings for {len(texts)} texts")
+            embeds = await self.embeddings.aembed_documents(texts)
+            # Cache the embeddings
+            VectorCache.set_embeddings(texts_tuple, embeds)
 
         # Prepare vectors for upsert
         vectors = []
@@ -82,6 +94,13 @@ class VectorStoreManager:
 
     async def amax_marginal_relevance_search(self, query: str, namespace: str, top_k: int = 4) -> List[Document]:
         logger.info(f"Performing similarity search for query: '{query}' in namespace: {namespace} (top_k={top_k})")
+        
+        # Check cache for search results first
+        cached_results = VectorCache.get_similarity_search(query, namespace, top_k)
+        if cached_results:
+            logger.info(f"Using cached search results for query: '{query}'")
+            return cached_results
+        
         # Embed the query
         query_embed = await self.embeddings.aembed_query(query)
 
@@ -102,5 +121,9 @@ class VectorStoreManager:
                         metadata={k: v for k, v in match.metadata.items() if k != "text"}
                     )
                 )
+        
+        # Cache the results
+        VectorCache.set_similarity_search(query, namespace, top_k, retrieved_documents)
+        
         logger.info(f"Retrieved {len(retrieved_documents)} documents for query: '{query}'")
         return retrieved_documents

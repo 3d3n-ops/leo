@@ -6,6 +6,7 @@ import httpx
 import openai
 from anthropic import Anthropic
 from dotenv import load_dotenv
+from cache_manager import cached, APICache
 
 # Load environment variables
 load_dotenv()
@@ -21,6 +22,7 @@ class PerplexityService:
         if not self.api_key:
             logger.warning("PERPLEXITY_API_KEY not found in environment variables")
     
+    @cached("perplexity_key_concepts", ttl=1800)  # 30 minutes cache
     async def get_key_concepts(self, topic: str, prompt: str) -> List[str]:
         """
         Get key concepts related to the topic and prompt using Perplexity Sonar
@@ -124,22 +126,70 @@ class LLMService:
         else:
             logger.warning("ANTHROPIC_API_KEY not found in environment variables")
     
+    @cached("llm_concept_explanations", ttl=3600)  # 1 hour cache
     async def generate_concept_explanations(self, key_concepts: List[str], topic: str, prompt: str) -> Dict[str, str]:
         """
         Generate explanations for each key concept using LLM
         """
         explanations = {}
         
-        for concept in key_concepts:
+        # PARALLEL PROCESSING: Generate explanations concurrently
+        async def get_explanation(concept):
             try:
-                explanation = await self._get_concept_explanation(concept, topic, prompt)
-                explanations[concept] = explanation
+                return await self._get_concept_explanation(concept, topic, prompt)
             except Exception as e:
                 logger.error(f"Error generating explanation for {concept}: {e}")
+                return f"Brief explanation of {concept} in the context of {topic}. This concept is fundamental to understanding {prompt} and provides the foundation for advanced learning in this area."
+        
+        # Create tasks for all concepts
+        tasks = [get_explanation(concept) for concept in key_concepts]
+        
+        # Process all concepts in parallel
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        # Build explanations dictionary
+        for i, concept in enumerate(key_concepts):
+            if i < len(results) and not isinstance(results[i], Exception):
+                explanations[concept] = results[i]
+            else:
                 explanations[concept] = f"Brief explanation of {concept} in the context of {topic}. This concept is fundamental to understanding {prompt} and provides the foundation for advanced learning in this area."
         
         return explanations
     
+    @cached("llm_concept_summary", ttl=3600)  # 1 hour cache
+    async def generate_concept_summary(self, key_concepts: List[str], topic: str, prompt: str) -> str:
+        """
+        Generate a comprehensive summary of the key concepts for Leo's first message
+        """
+        try:
+            summary_prompt = f"""
+            Based on the following learning context:
+            - Topic: {topic}
+            - Learning Goal: {prompt}
+            - Key Concepts: {', '.join(key_concepts)}
+            
+            Create a comprehensive 2-3 paragraph summary that:
+            1. Introduces the topic and its importance
+            2. Explains how the key concepts relate to the learning goal
+            3. Sets up an engaging learning journey
+            
+            This summary will be used by an AI assistant (Leo) to start a conversation with a learner.
+            Make it encouraging, informative, and set up the learner for success.
+            Keep it conversational and engaging.
+            """
+            
+            response = await self._call_llm(summary_prompt, max_tokens=300)
+            
+            if response:
+                return response.strip()
+            else:
+                return self._get_mock_summary(topic, prompt, key_concepts)
+                
+        except Exception as e:
+            logger.error(f"Error generating concept summary: {e}")
+            return self._get_mock_summary(topic, prompt, key_concepts)
+
+    @cached("llm_learning_suggestions", ttl=3600)  # 1 hour cache
     async def generate_learning_suggestions(self, concept_explanations: Dict[str, str], topic: str, prompt: str) -> List[str]:
         """
         Generate personalized learning suggestions using LLM
@@ -236,6 +286,15 @@ class LLMService:
         
         return suggestions
     
+    def _get_mock_summary(self, topic: str, prompt: str, key_concepts: List[str]) -> str:
+        """Fallback mock summary when LLM is not available"""
+        concepts_text = ", ".join(key_concepts[:3])  # Show first 3 concepts
+        return f"""Welcome to your learning journey in {topic}! 
+
+This is an exciting field that will help you achieve your goal: {prompt}. We've identified key concepts like {concepts_text} that are essential for mastering this topic. These concepts form the foundation of your learning path and will guide you toward success.
+
+I'm here to help you explore these concepts, answer your questions, and provide hands-on examples. How would you like to start learning? Would you prefer to dive into the fundamentals, work on a practical project, or explore a specific concept that interests you most?"""
+
     def _get_mock_suggestions(self, topic: str, prompt: str) -> List[str]:
         """Fallback mock suggestions when LLM is not available"""
         return [

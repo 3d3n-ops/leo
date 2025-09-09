@@ -17,6 +17,46 @@ class LeoService:
     Features tool calling capabilities and optional RAG/web search integration.
     """
     
+    # Model-specific optimizations
+    MODEL_CONFIGS = {
+        "deepseek/deepseek-chat-v3.1": {
+            "max_tokens": 1500,
+            "temperature": 0.6,
+            "timeout": 30.0,
+            "priority": "high"
+        },
+        "openai/gpt-5": {
+            "max_tokens": 2000,
+            "temperature": 0.7,
+            "timeout": 45.0,
+            "priority": "high"
+        },
+        "anthropic/claude-sonnet-4": {
+            "max_tokens": 2000,
+            "temperature": 0.7,
+            "timeout": 50.0,
+            "priority": "medium"
+        },
+        "google/gemini-2.5-pro": {
+            "max_tokens": 1500,
+            "temperature": 0.6,
+            "timeout": 60.0,
+            "priority": "low"
+        },
+        "qwen/qwen3-coder": {
+            "max_tokens": 1800,
+            "temperature": 0.6,
+            "timeout": 40.0,
+            "priority": "medium"
+        },
+        "x-ai/grok-code-fast-1": {
+            "max_tokens": 1500,
+            "temperature": 0.6,
+            "timeout": 35.0,
+            "priority": "high"
+        }
+    }
+    
     def __init__(self):
         self.openrouter_api_key = os.getenv("OPENROUTER_API_KEY")
         self.openrouter_base_url = "https://openrouter.ai/api/v1/chat/completions"
@@ -258,14 +298,17 @@ Remember: Your goal is to make learning accessible, engaging, and effective for 
     async def _check_for_tool_calls(self, messages: List[Dict], model: str) -> Optional[Dict]:
         """Check if the response contains tool calls using a non-streaming request"""
         try:
+            # Get model-specific configuration
+            config = self.MODEL_CONFIGS.get(model, {})
+            
             payload = {
                 "model": model,
                 "messages": messages,
                 "tools": self.tools,
                 "tool_choice": "auto",
                 "stream": False,
-                "temperature": 0.7,
-                "max_tokens": 2000
+                "temperature": config.get("temperature", 0.7),
+                "max_tokens": config.get("max_tokens", 2000)
             }
 
             headers = {
@@ -298,12 +341,15 @@ Remember: Your goal is to make learning accessible, engaging, and effective for 
     async def _stream_chat_response(self, messages: List[Dict], model: str) -> AsyncGenerator[str, None]:
         """Stream a regular chat response without tool calls"""
         try:
+            # Get model-specific configuration
+            config = self.MODEL_CONFIGS.get(model, {})
+            
             payload = {
                 "model": model,
                 "messages": messages,
                 "stream": True,
-                "temperature": 0.7,
-                "max_tokens": 2000
+                "temperature": config.get("temperature", 0.7),
+                "max_tokens": config.get("max_tokens", 2000)
             }
 
             headers = {
@@ -313,7 +359,9 @@ Remember: Your goal is to make learning accessible, engaging, and effective for 
                 "X-Title": "Docs Wiki - Leo AI Assistant"
             }
 
-            async with httpx.AsyncClient(timeout=60.0) as client:
+            # Use optimized timeout
+            timeout = config.get("timeout", 60.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
                 async with client.stream(
                     "POST",
                     self.openrouter_base_url,
@@ -326,11 +374,25 @@ Remember: Your goal is to make learning accessible, engaging, and effective for 
                         yield json.dumps({"error": f"API error: {response.status_code}"})
                         return
 
+                    # Optimize streaming with buffering for better performance
+                    buffer = ""
                     async for line in response.aiter_lines():
                         if line.startswith("data: "):
                             data = line[6:]  # Remove "data: " prefix
                             
                             if data.strip() == "[DONE]":
+                                # Flush any remaining buffer
+                                if buffer.strip():
+                                    try:
+                                        chunk = json.loads(buffer)
+                                        if "choices" in chunk and len(chunk["choices"]) > 0:
+                                            choice = chunk["choices"][0]
+                                            if "delta" in choice and "content" in choice["delta"]:
+                                                content = choice["delta"]["content"]
+                                                if content:
+                                                    yield json.dumps({"content": content})
+                                    except json.JSONDecodeError:
+                                        pass
                                 break
                             
                             try:
@@ -340,8 +402,11 @@ Remember: Your goal is to make learning accessible, engaging, and effective for 
                                     if "delta" in choice and "content" in choice["delta"]:
                                         content = choice["delta"]["content"]
                                         if content:
+                                            # Yield immediately for better perceived performance
                                             yield json.dumps({"content": content})
                             except json.JSONDecodeError:
+                                # Buffer incomplete JSON for next iteration
+                                buffer = data
                                 continue
 
         except Exception as e:
@@ -366,12 +431,26 @@ Remember: Your goal is to make learning accessible, engaging, and effective for 
                 
                 # Parse arguments
                 args = {}
-                if function_args:
+                if function_args is None:
+                    args = {}
+                elif isinstance(function_args, dict):
+                    # Already parsed
+                    args = function_args
+                elif isinstance(function_args, str):
                     try:
                         args = json.loads(function_args)
-                    except json.JSONDecodeError:
-                        logger.warning(f"Failed to parse tool call arguments: {function_args}")
-                        args = {"raw_arguments": function_args}
+                    except Exception:
+                        # As a fallback, try to coerce to JSON by fixing common issues
+                        try:
+                            sanitized = function_args.replace("\n", "\\n")
+                            args = json.loads(sanitized)
+                        except Exception:
+                            logger.warning(f"Failed to parse tool call arguments: {function_args}")
+                            args = {"raw_arguments": function_args}
+                else:
+                    # Unexpected type
+                    logger.warning(f"Unexpected type for tool call arguments: {type(function_args)}")
+                    args = {"raw_arguments": str(function_args)}
                 
                 # Handle different tool calls
                 if function_name == "write_code":
@@ -525,6 +604,89 @@ Remember: Your goal is to make learning accessible, engaging, and effective for 
         
         message_lower = message.lower()
         return any(keyword in message_lower for keyword in web_keywords)
+
+    async def generate_first_message(self, concept_summary: str, key_concepts: List[str], topic: str) -> str:
+        """
+        Generate Leo's first message based on the concept summary and key concepts
+        """
+        try:
+            first_message_prompt = f"""
+            You are Leo, an AI learning assistant. Based on this research summary about {topic}:
+
+            {concept_summary}
+
+            Key concepts identified: {', '.join(key_concepts)}
+
+            Generate a warm, engaging first message to start a learning conversation. The message should:
+            1. Acknowledge the learner's interest in {topic}
+            2. Reference the key concepts naturally
+            3. Ask how they'd like to continue learning
+            4. Be encouraging and supportive
+            5. Keep it conversational and not too long (2-3 sentences)
+
+            Make it feel like you're excited to help them learn!
+            """
+            
+            response = await self._call_leo_llm(first_message_prompt, max_tokens=150)
+            
+            if response:
+                return response.strip()
+            else:
+                return self._get_mock_first_message(topic, key_concepts)
+                
+        except Exception as e:
+            logger.error(f"Error generating first message: {e}")
+            return self._get_mock_first_message(topic, key_concepts)
+
+    async def _call_leo_llm(self, prompt: str, max_tokens: int = 200) -> Optional[str]:
+        """Call the LLM service for Leo's responses"""
+        try:
+            payload = {
+                "model": "openai/gpt-3.5-turbo",
+                "messages": [
+                    {
+                        "role": "system", 
+                        "content": "You are Leo, an enthusiastic AI learning assistant. Be encouraging, helpful, and conversational."
+                    },
+                    {
+                        "role": "user", 
+                        "content": prompt
+                    }
+                ],
+                "max_tokens": max_tokens,
+                "temperature": 0.8,
+                "stream": False
+            }
+
+            headers = {
+                "Authorization": f"Bearer {self.openrouter_api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://docs-wiki.vercel.app",
+                "X-Title": "Docs Wiki - Leo AI Assistant"
+            }
+
+            async with httpx.AsyncClient(timeout=30.0) as client:
+                response = await client.post(
+                    self.openrouter_base_url,
+                    headers=headers,
+                    json=payload
+                )
+                
+                if response.status_code == 200:
+                    data = response.json()
+                    return data["choices"][0]["message"]["content"].strip()
+                else:
+                    logger.error(f"Leo LLM API error: {response.status_code}")
+                    return None
+                    
+        except Exception as e:
+            logger.error(f"Error calling Leo LLM: {e}")
+            return None
+
+    def _get_mock_first_message(self, topic: str, key_concepts: List[str]) -> str:
+        """Fallback first message when LLM is not available"""
+        concepts_text = ", ".join(key_concepts[:3])
+        return f"Hi there! I'm Leo, your AI learning assistant. I'm excited to help you explore {topic}! I've identified some key concepts like {concepts_text} that we can dive into. How would you like to start your learning journey?"
 
 
 # Global Leo service instance
