@@ -1,0 +1,77 @@
+# Git
+.git
+.gitignore
+
+# Frontend (we only need backend)
+frontend/
+app/
+components/
+lib/
+public/
+*.md
+*.json
+*.ts
+*.tsx
+*.js
+*.jsx
+*.css
+*.scss
+
+# Python
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+.Python
+env
+pip-log.txt
+pip-delete-this-directory.txt
+.tox
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.log
+.git
+.mypy_cache
+.pytest_cache
+.hypothesis
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+*~
+
+# Documentation
+*.md
+docs/
+tests/
+
+# Deployment files
+railway.json
+nixpacks.toml
+Procfile
+deploy-*.sh
+deploy-*.bat
+test-*.py
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
