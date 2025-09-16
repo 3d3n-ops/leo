@@ -78,20 +78,24 @@ def select_optimal_model(message: str, requested_model: str) -> str:
     
     message_lower = message.lower()
     
-    # Code-related prompts - use coding-optimized models
+    # Code-related prompts - use ultra-fast coding models
     if any(keyword in message_lower for keyword in ["code", "function", "program", "script", "algorithm", "debug", "error"]):
-        return "deepseek/deepseek-chat-v3.1"  # Best for coding
+        return "google/gemma-2-9b-it"  # Ultra-fast for code
     
     # Math-related prompts - use reasoning models
     if any(keyword in message_lower for keyword in ["solve", "calculate", "equation", "math", "derivative", "integral", "algebra"]):
-        return "openai/gpt-5"  # Best for math reasoning
+        return "deepseek/deepseek-r1-distill-llama-70b"  # Fast reasoning model
     
     # Creative prompts - use creative models
     if any(keyword in message_lower for keyword in ["write", "create", "story", "poem", "creative", "imagine"]):
-        return "anthropic/claude-sonnet-4"  # Best for creative tasks
+        return "moonshotai/kimi-k2-0905"  # Fast creative model
+    
+    # Security/safety prompts - use specialized model
+    if any(keyword in message_lower for keyword in ["security", "safety", "guard", "filter", "moderate"]):
+        return "meta-llama/llama-guard-4-12b"  # Specialized safety model
     
     # General prompts - use fastest available model
-    return "deepseek/deepseek-chat-v3.1"  # Fastest overall
+    return "google/gemma-2-9b-it"  # Ultra-fast general model
 
 class IngestRequest(BaseModel):
     topic: str
@@ -172,13 +176,7 @@ async def ingest_docs(
         )
         llm_tasks.append(("summary", summary_task))
         
-        # Generate Leo's first message
-        leo_message_task = asyncio.create_task(
-            leo_service.generate_first_message("", key_concepts, topic)  # Will be updated with summary
-        )
-        llm_tasks.append(("leo_message", leo_message_task))
-        
-        # Wait for LLM tasks to complete
+        # Wait for summary to complete first
         llm_results = {}
         for task_name, task in llm_tasks:
             try:
@@ -187,7 +185,7 @@ async def ingest_docs(
                 logger.error(f"LLM task {task_name} failed: {e}")
                 llm_results[task_name] = ""
         
-        # Get the concept summary and generate Leo's final message
+        # Generate Leo's first message with the summary
         concept_summary = llm_results.get("summary", "")
         leo_first_message = await leo_service.generate_first_message(concept_summary, key_concepts, topic)
         
@@ -286,6 +284,7 @@ async def chat(request: ChatRequest):
         
         async def stream_generator():
             try:
+                # Use Leo service with optimized Groq models through OpenRouter
                 async for chunk_data in leo_service.chat_with_leo(
                     message=request.message,
                     model=optimal_model,
@@ -342,12 +341,19 @@ async def get_performance_stats():
                 "concurrent_requests": "optimized"
             },
             "model_configs": {
-                "deepseek/deepseek-chat-v3.1": {"timeout": 30.0, "priority": "high"},
-                "openai/gpt-5": {"timeout": 45.0, "priority": "high"},
-                "anthropic/claude-sonnet-4": {"timeout": 50.0, "priority": "medium"},
+                # Groq models (ultra-fast)
+                "moonshotai/kimi-k2-0905": {"timeout": 8.0, "priority": "ultra_high"},
+                "openai/gpt-oss-120b": {"timeout": 10.0, "priority": "high"},
+                "meta-llama/llama-guard-4-12b": {"timeout": 6.0, "priority": "ultra_high"},
+                "deepseek/deepseek-r1-distill-llama-70b": {"timeout": 8.0, "priority": "high"},
+                "google/gemma-2-9b-it": {"timeout": 5.0, "priority": "ultra_high"},
+                # Fallback models
+                "deepseek/deepseek-chat-v3.1": {"timeout": 30.0, "priority": "medium"},
+                "openai/gpt-5": {"timeout": 45.0, "priority": "medium"},
+                "anthropic/claude-sonnet-4": {"timeout": 50.0, "priority": "low"},
                 "google/gemini-2.5-pro": {"timeout": 60.0, "priority": "low"},
                 "qwen/qwen3-coder": {"timeout": 40.0, "priority": "medium"},
-                "x-ai/grok-code-fast-1": {"timeout": 35.0, "priority": "high"}
+                "x-ai/grok-code-fast-1": {"timeout": 35.0, "priority": "medium"}
             }
         }
     except Exception as e:

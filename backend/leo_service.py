@@ -13,29 +13,61 @@ logger = logging.getLogger(__name__)
 
 class LeoService:
     """
-    Leo AI Assistant Service - A dynamic AI agent for programming, math/STEM, and software engineering education.
-    Features tool calling capabilities and optional RAG/web search integration.
+    AI Assistant Service for Threads.io
+    Features tool calling capabilities
     """
     
-    # Model-specific optimizations
+    # Model-specific optimizations - Updated with Groq models through OpenRouter
     MODEL_CONFIGS = {
+        # Groq models (ultra-fast)
+        "moonshotai/kimi-k2-0905": {
+            "max_tokens": 2000,
+            "temperature": 0.6,
+            "timeout": 8.0,
+            "priority": "ultra_high"
+        },
+        "openai/gpt-oss-120b": {
+            "max_tokens": 2000,
+            "temperature": 0.7,
+            "timeout": 10.0,
+            "priority": "high"
+        },
+        "meta-llama/llama-guard-4-12b": {
+            "max_tokens": 1500,
+            "temperature": 0.5,
+            "timeout": 6.0,
+            "priority": "ultra_high"
+        },
+        "deepseek/deepseek-r1-distill-llama-70b": {
+            "max_tokens": 2000,
+            "temperature": 0.6,
+            "timeout": 8.0,
+            "priority": "high"
+        },
+        "google/gemma-2-9b-it": {
+            "max_tokens": 1500,
+            "temperature": 0.6,
+            "timeout": 5.0,
+            "priority": "ultra_high"
+        },
+        # Original models (fallback)
         "deepseek/deepseek-chat-v3.1": {
             "max_tokens": 1500,
             "temperature": 0.6,
             "timeout": 30.0,
-            "priority": "high"
+            "priority": "medium"
         },
         "openai/gpt-5": {
             "max_tokens": 2000,
             "temperature": 0.7,
             "timeout": 45.0,
-            "priority": "high"
+            "priority": "medium"
         },
         "anthropic/claude-sonnet-4": {
             "max_tokens": 2000,
             "temperature": 0.7,
             "timeout": 50.0,
-            "priority": "medium"
+            "priority": "low"
         },
         "google/gemini-2.5-pro": {
             "max_tokens": 1500,
@@ -53,7 +85,7 @@ class LeoService:
             "max_tokens": 1500,
             "temperature": 0.6,
             "timeout": 35.0,
-            "priority": "high"
+            "priority": "medium"
         }
     }
     
@@ -66,24 +98,62 @@ class LeoService:
         if not self.openrouter_api_key:
             logger.warning("OPENROUTER_API_KEY not found in environment variables")
         
-        # Leo's system prompt
-        self.system_prompt = """You are Leo, an AI assistant specialized in helping people learn programming, mathematics/STEM, and software engineering/computer science concepts. You are knowledgeable, patient, and encouraging.
+        # Leo's system prompt v1
+        self.system_prompt = """You are Leo, an AI assistant specialized in helping people learn programming, mathematics/STEM, and software engineering concepts. 
+You are knowledgeable, patient, and encouraging.
 
-Your capabilities include:
-1. **write_code**: Generate code snippets in any programming language with explanations
-2. **write_math**: Generate mathematical formulas and work in LaTeX format with proper rendering
-3. **write_diagrams**: Create diagrams using Mermaid syntax for visual learning
-4. **write_quiz**: Generate quizzes with questions and multiple choice answers
+## Core Behavior
+- Always explain concepts in a clear, step-by-step way with practical examples.
+- Be supportive and conversational to keep learners engaged.
+- When appropriate, call one of your tools instead of generating plain text.
+- After calling a tool, explain the result to the learner in natural language.
 
-When responding to users:
-- Be encouraging and supportive
-- Break down complex concepts into digestible parts
-- Provide practical examples and real-world applications
-- Use your tools when appropriate to enhance learning
-- If you need current information or the user asks about specific files/URLs that were uploaded, consider using RAG or web search
-- Always explain your reasoning and provide context
+## Available Tools
+1. `write_code(language, code, explanation, use_case)` - generate code with comments and explanations
+2. `write_math(formula, explanation, steps, context)` - return math in LaTeX with reasoning
+3. `write_diagrams(diagram_type, mermaid_code, description, learning_points)` - create visual diagrams in Mermaid
+4. `write_quiz(question, options, correct_answer, explanation, difficulty)` - create quizzes with multiple choice answers
+5. `use_rag_search(query, reason)` - search in uploaded documents
+6. `use_web_search(query, reason)` - search the web for current information
 
-Remember: Your goal is to make learning accessible, engaging, and effective for everyone."""
+## How to Decide When to Use Tools
+- If the user asks for code → call `write_code`
+- If the user asks to solve or explain a math problem → call `write_math`
+- If the user asks for a diagram, flowchart, or visualization → call `write_diagrams`
+- If the user asks for practice questions, tests, or quizzes → call `write_quiz`
+- If the user refers to uploaded files or documents → call `use_rag_search`
+- If the user asks about real-time info, news, or the “latest” version of something → call `use_web_search`
+- Always prefer tools when they add clarity, structure, or interactivity to the learning process.
+
+## Examples
+**Example 1 - Code**
+User: "Can you show me a Python function that reverses a string?"
+Assistant: (call `write_code` with language="python", code="...", explanation="...", use_case="...")
+
+**Example 2 - Math**
+User: "How do I solve quadratic equations?"
+Assistant: (call `write_math` with formula="x = (-b ± √(b^2 - 4ac)) / 2a", explanation="...", steps="...", context="...")
+
+**Example 3 - Diagram**
+User: "Can you draw me a flowchart for a login process?"
+Assistant: (call `write_diagrams` with diagram_type="flowchart", mermaid_code="...", description="...", learning_points="...")
+
+**Example 4 - Quiz**
+User: "Give me a quiz question about binary search."
+Assistant: (call `write_quiz` with question="...", options=["A", "B", "C", "D"], correct_answer="B", explanation="...", difficulty="intermediate")
+
+**Example 5 - RAG Search**
+User: "What did the uploaded document say about climate policy?"
+Assistant: (call `use_rag_search` with query="climate policy", reason="The user asked about content inside uploaded documents.")
+
+**Example 6 - Web Search**
+User: "What's the latest version of Python right now?"
+Assistant: (call `use_web_search` with query="latest version of Python", reason="The user asked for current info.")
+
+---
+
+Remember: Always respond in a warm, encouraging way, and after a tool call, explain the results in natural language so the learner understands them.
+"""
 
         # Tool definitions for function calling
         self.tools = [
@@ -279,17 +349,9 @@ Remember: Your goal is to make learning accessible, engaging, and effective for 
                     "content": f"Relevant context from uploaded documents:\n{rag_context}"
                 })
 
-            # First, make a non-streaming request to check for tool calls
-            tool_call_response = await self._check_for_tool_calls(messages, model)
-            
-            if tool_call_response and "tool_calls" in tool_call_response:
-                # Handle tool calls with non-streaming approach
-                async for chunk in self._handle_tool_calls_non_streaming(tool_call_response, use_rag, use_web_search, rag_documents):
-                    yield chunk
-            else:
-                # Stream regular chat response
-                async for chunk in self._stream_chat_response(messages, model):
-                    yield chunk
+            # Stream response directly - tool calls will be handled in streaming
+            async for chunk in self._stream_chat_response_with_tools(messages, model, use_rag, use_web_search, rag_documents):
+                yield chunk
 
         except Exception as e:
             logger.error(f"Error in Leo chat: {e}")
@@ -337,6 +399,134 @@ Remember: Your goal is to make learning accessible, engaging, and effective for 
         except Exception as e:
             logger.error(f"Error checking for tool calls: {e}")
             return None
+
+    async def _stream_chat_response_with_tools(
+        self, 
+        messages: List[Dict], 
+        model: str, 
+        use_rag: bool, 
+        use_web_search: bool, 
+        rag_documents: Optional[List[Dict]]
+    ) -> AsyncGenerator[str, None]:
+        """Stream chat response with tool call support"""
+        try:
+            # Get model-specific configuration
+            config = self.MODEL_CONFIGS.get(model, {})
+            
+            payload = {
+                "model": model,
+                "messages": messages,
+                "tools": self.tools,
+                "tool_choice": "auto",
+                "stream": True,
+                "temperature": config.get("temperature", 0.7),
+                "max_tokens": config.get("max_tokens", 2000)
+            }
+
+            headers = {
+                "Authorization": f"Bearer {self.openrouter_api_key}",
+                "Content-Type": "application/json",
+                "HTTP-Referer": "https://docs-wiki.vercel.app",
+                "X-Title": "Docs Wiki - Leo AI Assistant"
+            }
+
+            # Use optimized timeout
+            timeout = config.get("timeout", 60.0)
+            async with httpx.AsyncClient(timeout=timeout) as client:
+                async with client.stream(
+                    "POST",
+                    self.openrouter_base_url,
+                    headers=headers,
+                    json=payload
+                ) as response:
+                    if response.status_code != 200:
+                        error_text = await response.aread()
+                        logger.error(f"OpenRouter API error: {response.status_code} - {error_text}")
+                        yield json.dumps({"error": f"API error: {response.status_code}"})
+                        return
+
+                    # Track tool calls being built
+                    current_tool_calls = {}
+                    
+                    # Process streaming response
+                    async for line in response.aiter_lines():
+                        if line.startswith("data: "):
+                            data = line[6:]  # Remove "data: " prefix
+                            
+                            if data.strip() == "[DONE]":
+                                # Process any remaining tool calls
+                                for tool_call in current_tool_calls.values():
+                                    if tool_call["name"]:
+                                        try:
+                                            # Parse accumulated arguments
+                                            args = json.loads(tool_call["arguments"]) if tool_call["arguments"] else {}
+                                        except json.JSONDecodeError:
+                                            args = {}
+                                        
+                                        if tool_call["name"] in ["write_code", "write_math", "write_diagrams", "write_quiz"]:
+                                            yield json.dumps({
+                                                "tool_call": {
+                                                    "name": tool_call["name"],
+                                                    "arguments": args
+                                                }
+                                            })
+                                        elif tool_call["name"] == "use_rag_search" and use_rag and rag_documents:
+                                            search_result = self._simulate_rag_search(args.get("query", ""), rag_documents)
+                                            yield json.dumps({
+                                                "tool_call": {
+                                                    "name": tool_call["name"],
+                                                    "arguments": args,
+                                                    "result": search_result
+                                                }
+                                            })
+                                        elif tool_call["name"] == "use_web_search" and use_web_search:
+                                            yield json.dumps({
+                                                "tool_call": {
+                                                    "name": tool_call["name"],
+                                                    "arguments": args,
+                                                    "result": "Web search capability available (implementation needed)"
+                                                }
+                                            })
+                                break
+                            
+                            try:
+                                chunk = json.loads(data)
+                                if "choices" in chunk and len(chunk["choices"]) > 0:
+                                    choice = chunk["choices"][0]
+                                    
+                                    # Handle tool calls
+                                    if "delta" in choice and "tool_calls" in choice["delta"]:
+                                        tool_calls = choice["delta"]["tool_calls"]
+                                        for tool_call in tool_calls:
+                                            tool_call_index = tool_call.get("index", 0)
+                                            
+                                            # Initialize tool call if not exists
+                                            if tool_call_index not in current_tool_calls:
+                                                current_tool_calls[tool_call_index] = {
+                                                    "name": "",
+                                                    "arguments": "",
+                                                    "id": tool_call.get("id", "")
+                                                }
+                                            
+                                            # Update tool call data
+                                            if "function" in tool_call:
+                                                if "name" in tool_call["function"]:
+                                                    current_tool_calls[tool_call_index]["name"] = tool_call["function"]["name"]
+                                                if "arguments" in tool_call["function"]:
+                                                    current_tool_calls[tool_call_index]["arguments"] += tool_call["function"]["arguments"]
+                                    
+                                    # Handle regular content
+                                    elif "delta" in choice and "content" in choice["delta"]:
+                                        content = choice["delta"]["content"]
+                                        if content:
+                                            yield json.dumps({"content": content})
+                            
+                            except json.JSONDecodeError:
+                                continue
+
+        except Exception as e:
+            logger.error(f"Error streaming chat response with tools: {e}")
+            yield json.dumps({"error": str(e)})
 
     async def _stream_chat_response(self, messages: List[Dict], model: str) -> AsyncGenerator[str, None]:
         """Stream a regular chat response without tool calls"""
@@ -639,10 +829,10 @@ Remember: Your goal is to make learning accessible, engaging, and effective for 
             return self._get_mock_first_message(topic, key_concepts)
 
     async def _call_leo_llm(self, prompt: str, max_tokens: int = 200) -> Optional[str]:
-        """Call the LLM service for Leo's responses"""
+        """Call the LLM service for Leo's responses using fastest Groq model"""
         try:
             payload = {
-                "model": "openai/gpt-3.5-turbo",
+                "model": "google/gemma-2-9b-it",  # Ultra-fast Groq model
                 "messages": [
                     {
                         "role": "system", 
@@ -687,6 +877,45 @@ Remember: Your goal is to make learning accessible, engaging, and effective for 
         """Fallback first message when LLM is not available"""
         concepts_text = ", ".join(key_concepts[:3])
         return f"Hi there! I'm Leo, your AI learning assistant. I'm excited to help you explore {topic}! I've identified some key concepts like {concepts_text} that we can dive into. How would you like to start your learning journey?"
+
+    async def chat_with_leo(
+        self, 
+        message: str, 
+        model: str, 
+        rag_documents: Optional[List[Dict]] = None, 
+        use_rag: bool = False, 
+        use_web_search: bool = False
+    ) -> AsyncGenerator[str, None]:
+        """Main chat method that handles both regular chat and tool calls"""
+        try:
+            # Prepare messages
+            messages = [
+                {"role": "system", "content": self.system_prompt},
+                {"role": "user", "content": message}
+            ]
+            
+            # Add RAG context if available
+            if use_rag and rag_documents:
+                rag_context = self._format_rag_context(rag_documents)
+                if rag_context:
+                    messages.append({
+                        "role": "system", 
+                        "content": f"Additional context from uploaded documents:\n\n{rag_context}"
+                    })
+            
+            # Use streaming with tools
+            async for chunk in self._stream_chat_response_with_tools(
+                messages=messages,
+                model=model,
+                use_rag=use_rag,
+                use_web_search=use_web_search,
+                rag_documents=rag_documents
+            ):
+                yield chunk
+                
+        except Exception as e:
+            logger.error(f"Error in chat_with_leo: {e}")
+            yield json.dumps({"error": str(e)})
 
 
 # Global Leo service instance

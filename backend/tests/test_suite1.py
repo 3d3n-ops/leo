@@ -25,6 +25,10 @@ AVAILABLE_MODELS = [
     "qwen/qwen3-coder",
     "deepseek/deepseek-chat-v3.1",
     "google/gemini-2.5-pro",
+    "moonshotai/kimi-k2-0905",
+    "openai/gpt-oss-120b",
+    "meta-llama/llama-guard-4-12b",
+    "deepseek/deepseek-r1-distill-llama-70b",
 ]
 
 # Test prompts for different scenarios
