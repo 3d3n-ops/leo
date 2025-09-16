@@ -3,7 +3,9 @@ echo 🐳 Testing Docker Build Locally...
 echo.
 
 echo 📦 Building Docker image...
+cd backend
 docker build -t docs-wiki-backend .
+cd ..
 
 if %ERRORLEVEL% neq 0 (
     echo ❌ Docker build failed!

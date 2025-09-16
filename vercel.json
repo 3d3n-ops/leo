@@ -1,0 +1,30 @@
+{
+  "version": 2,
+  "functions": {
+    "backend/api/*.py": {
+      "runtime": "@vercel/python@3.9.0",
+      "maxDuration": 30
+    }
+  },
+  "routes": [
+    {
+      "src": "/api/ingest",
+      "dest": "/backend/api/ingest.py"
+    },
+    {
+      "src": "/api/chat",
+      "dest": "/backend/api/chat.py"
+    },
+    {
+      "src": "/api/performance",
+      "dest": "/backend/api/performance.py"
+    },
+    {
+      "src": "/api/cache/clear",
+      "dest": "/backend/api/cache_clear.py"
+    }
+  ],
+  "env": {
+    "PYTHONPATH": "backend"
+  }
+}

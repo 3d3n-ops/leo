@@ -4,7 +4,9 @@ echo "🐳 Testing Docker Build Locally..."
 echo
 
 echo "📦 Building Docker image..."
+cd backend
 docker build -t docs-wiki-backend .
+cd ..
 
 if [ $? -ne 0 ]; then
     echo "❌ Docker build failed!"
